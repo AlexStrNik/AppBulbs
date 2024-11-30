@@ -46,6 +46,7 @@ class DecorationWindow: NSPanel {
         self.isOpaque = false
         self.isMovable = false
         self.hasShadow = false
+        self.level = NSWindow.Level(Int(CGShieldingWindowLevel()))
         self.ignoresMouseEvents = true
         self.backgroundColor = .clear
     }

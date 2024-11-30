@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct Lamp: View {
     var enabled: Bool
@@ -57,7 +58,12 @@ struct Lamp: View {
 }
 
 struct DecorationView: View {
-    @State var lampCount: Int = 0
+    var width: CGFloat
+    var time: Double
+    
+    private var lampCount: Int {
+        Int(width / lampSpacing)
+    }
     
     private let lampSpacing: CGFloat = 30
     
@@ -79,34 +85,59 @@ struct DecorationView: View {
     }
     
     var body: some View {
-        TimelineView(.animation) { time in
-            HStack {
-                ForEach(0...lampCount, id: \.self) { index in
-                    Lamp(enabled: isLampEnabled(index: index, time: time.date.timeIntervalSince1970))
-                        .rotationEffect(
-                            .degrees(
-                                rotationAngle(index: index, time: time.date.timeIntervalSince1970)
-                            ),
-                            anchor: .top
-                        )
-                    
-                    if index < lampCount {
-                        Spacer()
-                    }
+        HStack {
+            ForEach(0...lampCount, id: \.self) { index in
+                Lamp(enabled: isLampEnabled(index: index, time: time))
+                    .rotationEffect(
+                        .degrees(
+                            rotationAngle(index: index, time: time)
+                        ),
+                        anchor: .top
+                    )
+                
+                if index < lampCount {
+                    Spacer()
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onGeometryChange(for: Int.self) { proxy in
-            Int(proxy.size.width / lampSpacing)
-        } action: { newValue in
-            lampCount = newValue
-        }
+        .compositingGroup()
     }
 }
 
-#Preview {
-    DecorationView()
-        .frame(width: 500, height: 500)
-        .padding()
+
+struct ScreenView: View {
+    var windowPublisher: AnyPublisher<[DecoratedWindow], Never>
+    var timePublisher: AnyPublisher<Double, Never>
+    
+    @State private var windows: [DecoratedWindow] = []
+    @State private var time: Double = 0
+    
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(windows, id: \.windowId) { window in
+                Rectangle()
+                    .fill(.black)
+                    .offset(x: window.frame.minX, y: window.frame.minY)
+                    .frame(width: window.frame.width, height: window.frame.height)
+                    .blendMode(.destinationOut)
+                
+                DecorationView(
+                    width: window.frame.width,
+                    time: time + Double(window.windowId / 100)
+                )
+                .offset(x: window.frame.minX, y: window.frame.minY)
+                .frame(width: window.frame.width, height: window.frame.height)
+            }
+            
+            Color.clear
+        }
+        .compositingGroup()
+        .onReceive(windowPublisher) {
+            windows = $0.filter { $0.order >= 0 }.sorted { $0.order > $1.order }
+        }
+        .onReceive(timePublisher) {
+            time = $0
+        }
+    }
 }

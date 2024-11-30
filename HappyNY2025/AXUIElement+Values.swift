@@ -5,6 +5,12 @@
 //  Created by Aleksandr Strizhnev on 30.11.2024.
 //
 
+extension CVTimeStamp {
+    var timeInterval: TimeInterval {
+        return TimeInterval(videoTime) / TimeInterval(self.videoTimeScale)
+    }
+}
+
 extension AXUIElement {
     var frame: CGRect {
         var frameValue: CFTypeRef?

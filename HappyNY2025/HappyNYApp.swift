@@ -6,18 +6,29 @@
 //
 
 import SwiftUI
+import Combine
 
-struct DecoratedApplication {
+class DecoratedApplication {
+    let applicationId: Int32
     let observer: AXObserver
+    
+    init(applicationId: Int32, observer: AXObserver) {
+        self.applicationId = applicationId
+        self.observer = observer
+    }
 }
 
 class DecoratedWindow {
     let windowId: CGWindowID
-    let decoration: DecorationWindow
+    let applicationId: Int32
+    var frame: CGRect
+    var order: Int
     
-    init(windowId: CGWindowID, decoration: DecorationWindow) {
+    init(windowId: CGWindowID, applicationId: Int32, frame: CGRect) {
         self.windowId = windowId
-        self.decoration = decoration
+        self.applicationId = applicationId
+        self.frame = frame
+        self.order = -1
     }
 }
 
@@ -39,21 +50,21 @@ extension CFString {
     }
 }
 
-func orderDecorations() {
+func alignDecorations() {
     let options = CGWindowListOption(
         arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly, .optionOnScreenAboveWindow
     )
     guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as NSArray? as? [[CFString: AnyObject]] else {
         return
     }
-    
+
     for decoration in AppDelegate.windowDecorations {
-        decoration.value.decoration.orderOut(nil)
+        decoration.value.order = -1
     }
     
-    var topDecoration = Int.max
-    for (index, window) in windowList.enumerated() {
-        guard let windowId = window[kCGWindowNumber] as? CGWindowID else {
+    var topDecoration = 0
+    for window in windowList {
+        guard let windowId = window[kCGWindowNumber] as? CGWindowID, let boundsDict = window[kCGWindowBounds] else {
             continue
         }
         
@@ -61,37 +72,33 @@ func orderDecorations() {
             continue
         }
         
-        decoration.decoration.order(.above, relativeTo: Int(windowId))
-        
-        if index < topDecoration {
-            topDecoration = index
-            decoration.decoration.level = .floating
-        } else {
-            decoration.decoration.level = .normal
+        guard let rect = CGRect(dictionaryRepresentation: boundsDict as! CFDictionary) else {
+            continue
         }
+        
+        decoration.frame = rect
+        decoration.order = topDecoration
+        topDecoration += 1
+    }
+    
+    DispatchQueue.main.async {
+        AppDelegate.windowSubject.send(Array(AppDelegate.windowDecorations.values))
     }
 }
 
 func decorateWindow(
     observer: AXObserver,
+    applicationId: Int32,
     window: AXUIElement
 ) {
     guard window.windowRole else {
         return
     }
     
-    guard window.frame != CGRect.zero, window.frame.width > 100 else {
-        return
-    }
-    
-    let decorationWindow = DecorationWindow(
-        rect: window.frame
-    )
-    decorationWindow.contentView = NSHostingView(rootView: DecorationView())
-    
     let decoration = DecoratedWindow(
         windowId: window.windowId,
-        decoration: decorationWindow
+        applicationId: applicationId,
+        frame: window.frame
     )
     AppDelegate.windowDecorations[window.windowId] = decoration
     
@@ -103,6 +110,8 @@ func decorateWindow(
         kAXUIElementDestroyedNotification as CFString,
         refcon
     )
+    
+    AppDelegate.windowSubject.send(Array(AppDelegate.windowDecorations.values))
 }
 
 func applicationListener(
@@ -116,20 +125,19 @@ func applicationListener(
             return
         }
         
-        guard frame != CGRect.zero else {
+        AppDelegate.windowDecorations[windowId]?.frame = frame
+    } else if notification.windowCreated {
+        guard let element, let observer, let refcon else {
             return
         }
         
-        AppDelegate.windowDecorations[windowId]?.decoration.setFrameOrigin(frame.flipped.origin)
-        AppDelegate.windowDecorations[windowId]?.decoration.setContentSize(
-            frame.size
-        )
-    } else if notification.windowCreated {
-        guard let element, let observer else {
-            return
-        }
+        let application = Unmanaged<DecoratedApplication>.fromOpaque(refcon).takeUnretainedValue()
 
-        decorateWindow(observer: observer, window: element)
+        decorateWindow(
+            observer: observer,
+            applicationId: application.applicationId,
+            window: element
+        )
     } else if notification.elementDestroyed {
         guard let refcon else {
             return
@@ -137,16 +145,31 @@ func applicationListener(
         
         let windowId = Unmanaged<DecoratedWindow>.fromOpaque(refcon).takeUnretainedValue().windowId
         
-        AppDelegate.windowDecorations[windowId]?.decoration.close()
         AppDelegate.windowDecorations.removeValue(forKey: windowId)
     }
-    
-    orderDecorations()
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     fileprivate static var observedApplications: [Int32 : DecoratedApplication] = [:]
     fileprivate static var windowDecorations: [CGWindowID: DecoratedWindow] = [:]
+    
+    fileprivate static var windowPublisher: AnyPublisher<[DecoratedWindow], Never> {
+        windowSubject.eraseToAnyPublisher()
+    }
+    fileprivate static let windowSubject = PassthroughSubject<[DecoratedWindow], Never>()
+    
+    fileprivate static var timePublisher: AnyPublisher<Double, Never> {
+        timeSubject.eraseToAnyPublisher()
+    }
+    fileprivate static let timeSubject = PassthroughSubject<Double, Never>()
+    
+    var displayLink: CVDisplayLink = {
+        var dl: CVDisplayLink? = nil
+        CVDisplayLinkCreateWithActiveCGDisplays(&dl)
+        return dl!
+    }()
+    
+    fileprivate static var shieldingWindow: DecorationWindow? = nil
     
     fileprivate var applicationsObserver: NSKeyValueObservation?
     
@@ -154,7 +177,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else {
             return
         }
-
+        
+        AppDelegate.shieldingWindow = DecorationWindow(
+            rect: NSScreen.screens.first!.frame
+        )
+        AppDelegate.shieldingWindow?.contentView = NSHostingView(
+            rootView: ScreenView(
+                windowPublisher: AppDelegate.windowPublisher,
+                timePublisher: AppDelegate.timePublisher
+            )
+        )
+        AppDelegate.shieldingWindow?.orderFrontRegardless()
+        
         checkPermission()
         
         applicationsObserver = NSWorkspace.shared.observe(\.runningApplications, options: [.initial]) {(model, change) in
@@ -162,7 +196,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 guard application.activationPolicy == .regular else {
                     continue
                 }
-
+                
+                guard application.bundleIdentifier != "xyz.alexstrnik.HappyNY2025" else {
+                    continue
+                }
+                
                 if AppDelegate.observedApplications[application.processIdentifier] == nil {
                     self.observeApplication(with: application.processIdentifier)
                 }
@@ -178,16 +216,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             
             for identifier in deadIdentifiers {
                 AppDelegate.observedApplications.removeValue(forKey: identifier)
+                let deadWindows = AppDelegate.windowDecorations.values.filter {
+                    $0.applicationId == identifier
+                }
+                for window in deadWindows {
+                    AppDelegate.windowDecorations.removeValue(forKey: window.windowId)
+                }
             }
         }
         
-        orderDecorations()
+        CVDisplayLinkSetOutputHandler(displayLink) { displayLink, inNow, inOutputTime, flageIn, flagsOut in
+            alignDecorations()
+            DispatchQueue.main.async {
+                AppDelegate.timeSubject.send(inNow.pointee.timeInterval)
+            }
+            return kCVReturnSuccess
+        }
+        
+        CVDisplayLinkStart(displayLink)
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        for decoration in AppDelegate.windowDecorations {
-            decoration.value.decoration.close()
-        }
         AppDelegate.observedApplications = [:]
         AppDelegate.windowDecorations = [:]
     }
@@ -214,20 +263,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         
-        let refcon = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
+        let decoratedApplication = DecoratedApplication(
+            applicationId: applicationId,
+            observer: observer
+        )
         
-        AXObserverAddNotification(
-            observer,
-            applicationElement,
-            kAXWindowMovedNotification as CFString,
-            refcon
-        )
-        AXObserverAddNotification(
-            observer,
-            applicationElement,
-            kAXWindowResizedNotification as CFString,
-            refcon
-        )
+        let refcon = UnsafeMutableRawPointer(Unmanaged.passRetained(decoratedApplication).toOpaque())
+        
         AXObserverAddNotification(
             observer,
             applicationElement,
@@ -305,12 +347,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for window in windows {
             decorateWindow(
                 observer: observer,
+                applicationId: applicationId,
                 window: window
             )
         }
         
-        AppDelegate.observedApplications[applicationId] = DecoratedApplication(
-            observer: observer
-        )
+        AppDelegate.observedApplications[applicationId] = decoratedApplication
     }
 }
