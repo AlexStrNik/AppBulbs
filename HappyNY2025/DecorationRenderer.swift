@@ -142,12 +142,9 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
             
         let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
         
-        alignDecorations()
-        
         currentTime += 1.0 / Float(view.preferredFramesPerSecond)
         
-        let windows = AppDelegate.windowDecorations.values.filter { $0.order >= 0 }.sorted { $0.order > $1.order }
-        for window in windows {
+        for window in getWindows() {
             var windowUniforms = WindowUniforms(
                 position: window.position,
                 size: window.size

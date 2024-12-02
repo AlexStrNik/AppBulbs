@@ -131,7 +131,7 @@ fragment float4 decorationFragmentFunction(
     float4 innerColor = float4(1.0, 0.9, 0.5, 1.0);
     
     float4 enabledColor = mix(innerColor, outerColor, dist);
-    float4 disabledColor = float4(0.5, 0.4, 0.2, 1.0);
+    float4 disabledColor = float4(0.3, 0.2, 0.2, 1.0);
     
     float4 bulbColor = mix(disabledColor, enabledColor, smoothIndex(index, renderUniforms));
     color += bulbColor * smoothstep(1.0, 0.7, dist);

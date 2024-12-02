@@ -45,7 +45,7 @@ class MetalDecorationWindow: NSPanel {
         self.standardWindowButton(.closeButton)?.isHidden = true
         self.standardWindowButton(.zoomButton)?.isHidden = true
         
-        self.collectionBehavior = [.stationary, .ignoresCycle, .fullScreenAuxiliary]
+        self.collectionBehavior = [.stationary, .ignoresCycle, .fullScreenAuxiliary, .canJoinAllSpaces, .canJoinAllApplications]
         self.isOpaque = false
         self.isMovable = false
         self.hasShadow = false
