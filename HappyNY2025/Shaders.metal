@@ -71,7 +71,7 @@ static float radians(float degrees)
 
 static float smoothIndex(float index, RenderUniforms renderUniforms)
 {
-    return int(index + renderUniforms.iTime * 0.5) % 2;
+    return int(2 + index + renderUniforms.iTime * 0.5) % 2;
 }
 
 static float4 lightColor(float index, RenderUniforms renderUniforms)
@@ -91,6 +91,24 @@ static float lightFunc(float distance)
 float bulbRotation(float index, float count, RenderUniforms renderUniforms)
 {
     return 15.0 * sin(index / count * 3.0 + renderUniforms.iTime * 1.5);
+}
+
+float4 sideLight(float shift, float index, float count, float2 uv, RenderUniforms renderUniforms, float2 iResolution) {
+    float2 lightRadius = float2(8.0, 8.0) * renderUniforms.bulbScale;
+    lightRadius.x /= iResolution.x / count;
+    lightRadius.y /= iResolution.y;
+    
+    float2 bulbPosition = float2(0.5 + shift, 16.0 * renderUniforms.bulbScale / iResolution.y);
+    float rotation = -bulbRotation(index + shift, count, renderUniforms);
+    bulbPosition.y *= count / (iResolution.x / iResolution.y);
+    bulbPosition = rotate2d(bulbPosition, radians(rotation), float2(0.5 + shift, 0));
+    bulbPosition.y /= count / (iResolution.x / iResolution.y);
+    
+    float2 pos = uv - bulbPosition;
+    float2 a = (pos * pos) / (lightRadius * lightRadius);
+    float dist = a.x + a.y;
+    
+    return lightColor(index + shift, renderUniforms) * lightFunc(dist);
 }
 
 fragment float4 decorationFragmentFunction(
@@ -136,45 +154,11 @@ fragment float4 decorationFragmentFunction(
     float4 bulbColor = mix(disabledColor, enabledColor, smoothIndex(index, renderUniforms));
     color += bulbColor * smoothstep(1.0, 0.7, dist);
     
-    // LIGHT SELF
-    
-    float2 lightRadius = float2(8.0, 8.0) * renderUniforms.bulbScale;
-    lightRadius.x /= iResolution.x / count;
-    lightRadius.y /= iResolution.y;
-    
-    pos = st - bulbPosition;
-    a = (pos * pos) / (lightRadius * lightRadius);
-    dist = a.x + a.y;
-    
-    color += lightColor(index, renderUniforms) * lightFunc(dist);
-    
-    // LIGHT LEFT
-    
-    bulbPosition = float2(-0.5, 16.0 * renderUniforms.bulbScale / iResolution.y);
-    rotation = -bulbRotation(index, count, renderUniforms);
-    bulbPosition.y *= count / (iResolution.x / iResolution.y);
-    bulbPosition = rotate2d(bulbPosition, radians(rotation), float2(-0.5, 0));
-    bulbPosition.y /= count / (iResolution.x / iResolution.y);
-    
-    pos = uv - bulbPosition;
-    a = (pos * pos) / (lightRadius * lightRadius);
-    dist = a.x + a.y;
-    
-    color += lightColor(index - 1.0, renderUniforms) * lightFunc(dist);
-    
-    // LIGHT RIGHT
-    
-    bulbPosition = float2(1.5, 16.0 * renderUniforms.bulbScale / iResolution.y);
-    rotation = -bulbRotation(index, count, renderUniforms);
-    bulbPosition.y *= count / (iResolution.x / iResolution.y);
-    bulbPosition = rotate2d(bulbPosition, radians(rotation), float2(1.5, 0));
-    bulbPosition.y /= count / (iResolution.x / iResolution.y);
-    
-    pos = uv - bulbPosition;
-    a = (pos * pos) / (lightRadius * lightRadius);
-    dist = a.x + a.y;
-    
-    color += lightColor(index + 1.0, renderUniforms) * lightFunc(dist);
+    color += sideLight(0, index, count, uv, renderUniforms, iResolution);
+    color += sideLight(-1, index, count, uv, renderUniforms, iResolution);
+    color += sideLight(1, index, count, uv, renderUniforms, iResolution);
+    color += sideLight(-2, index, count, uv, renderUniforms, iResolution);
+    color += sideLight(2, index, count, uv, renderUniforms, iResolution);
     
     float2 wireSize = float2(6.0, 6.0) * renderUniforms.bulbScale;
     wireSize.x /= iResolution.x / count;
