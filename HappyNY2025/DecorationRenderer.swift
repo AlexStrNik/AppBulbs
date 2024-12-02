@@ -30,6 +30,7 @@ struct GlobalUniforms {
 
 struct RenderUniforms {
     var time: Float
+    var bulbScale: Float
 }
 
 func makeDecorationPipelineState(
@@ -197,7 +198,8 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
         commandEncoder.setVertexBytes(&windowUniforms, length: MemoryLayout<WindowUniforms>.stride, index: 2)
         
         var renderUniforms = RenderUniforms(
-            time: currentTime
+            time: currentTime,
+            bulbScale: 1.5
         )
         
         commandEncoder.setFragmentBytes(&renderUniforms, length: MemoryLayout<RenderUniforms>.stride, index: 1)
