@@ -21,7 +21,19 @@ class DecoratedApplication {
 class DecoratedWindow {
     let windowId: CGWindowID
     let applicationId: Int32
-    var frame: CGRect
+    
+    var frame: CGRect {
+        didSet {
+            size.x = Float(frame.width)
+            size.y = Float(frame.height)
+            position.x = Float(frame.minX)
+            position.y = Float(frame.minY)
+        }
+    }
+    
+    private(set) var size: SIMD2<Float> = .zero
+    private(set) var position: SIMD2<Float> = .zero
+    
     var order: Int
     
     init(windowId: CGWindowID, applicationId: Int32, frame: CGRect) {
@@ -80,10 +92,6 @@ func alignDecorations() {
         decoration.order = topDecoration
         topDecoration += 1
     }
-    
-    DispatchQueue.main.async {
-        AppDelegate.windowSubject.send(Array(AppDelegate.windowDecorations.values))
-    }
 }
 
 func decorateWindow(
@@ -110,8 +118,6 @@ func decorateWindow(
         kAXUIElementDestroyedNotification as CFString,
         refcon
     )
-    
-    AppDelegate.windowSubject.send(Array(AppDelegate.windowDecorations.values))
 }
 
 func applicationListener(
@@ -151,25 +157,9 @@ func applicationListener(
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     fileprivate static var observedApplications: [Int32 : DecoratedApplication] = [:]
-    fileprivate static var windowDecorations: [CGWindowID: DecoratedWindow] = [:]
-    
-    fileprivate static var windowPublisher: AnyPublisher<[DecoratedWindow], Never> {
-        windowSubject.eraseToAnyPublisher()
-    }
-    fileprivate static let windowSubject = PassthroughSubject<[DecoratedWindow], Never>()
-    
-    fileprivate static var timePublisher: AnyPublisher<Double, Never> {
-        timeSubject.eraseToAnyPublisher()
-    }
-    fileprivate static let timeSubject = PassthroughSubject<Double, Never>()
-    
-    var displayLink: CVDisplayLink = {
-        var dl: CVDisplayLink? = nil
-        CVDisplayLinkCreateWithActiveCGDisplays(&dl)
-        return dl!
-    }()
-    
-    fileprivate static var shieldingWindow: DecorationWindow? = nil
+    static var windowDecorations: [CGWindowID: DecoratedWindow] = [:]
+        
+    fileprivate static var shieldingWindow: MetalDecorationWindow? = nil
     
     fileprivate var applicationsObserver: NSKeyValueObservation?
     
@@ -178,14 +168,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         
-        AppDelegate.shieldingWindow = DecorationWindow(
+        AppDelegate.shieldingWindow = MetalDecorationWindow(
             rect: NSScreen.screens.first!.frame
-        )
-        AppDelegate.shieldingWindow?.contentView = NSHostingView(
-            rootView: ScreenView(
-                windowPublisher: AppDelegate.windowPublisher,
-                timePublisher: AppDelegate.timePublisher
-            )
         )
         AppDelegate.shieldingWindow?.orderFrontRegardless()
         
@@ -224,16 +208,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
         }
-        
-        CVDisplayLinkSetOutputHandler(displayLink) { displayLink, inNow, inOutputTime, flageIn, flagsOut in
-            alignDecorations()
-            DispatchQueue.main.async {
-                AppDelegate.timeSubject.send(inNow.pointee.timeInterval)
-            }
-            return kCVReturnSuccess
-        }
-        
-        CVDisplayLinkStart(displayLink)
     }
     
     func applicationWillTerminate(_ notification: Notification) {
