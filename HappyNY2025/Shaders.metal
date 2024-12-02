@@ -69,11 +69,6 @@ static float radians(float degrees)
     return degrees / 180.0 * PI;
 }
 
-static float mod(float x, float y)
-{
-    return x - y * floor(x/y);
-}
-
 static float smoothIndex(float index, RenderUniforms renderUniforms)
 {
     return int(index + renderUniforms.iTime * 0.5) % 2;

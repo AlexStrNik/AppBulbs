@@ -27,32 +27,6 @@ extension CGRect {
     }
 }
 
-class DecorationWindow: NSPanel {
-    public convenience init(rect: CGRect) {
-        self.init(
-            contentRect: rect.flipped,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        
-        self.titlebarAppearsTransparent = true
-        self.titleVisibility = .hidden
-        
-        self.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        self.standardWindowButton(.closeButton)?.isHidden = true
-        self.standardWindowButton(.zoomButton)?.isHidden = true
-        
-        self.collectionBehavior = [.stationary, .ignoresCycle, .fullScreenAuxiliary]
-        self.isOpaque = false
-        self.isMovable = false
-        self.hasShadow = false
-        self.level = .floating // NSWindow.Level(Int(CGShieldingWindowLevel()))
-        self.ignoresMouseEvents = true
-        self.backgroundColor = .clear
-    }
-}
-
 class MetalDecorationWindow: NSPanel {
     private var renderer: DecorationRenderer?
     

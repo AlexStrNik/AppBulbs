@@ -75,9 +75,13 @@ func alignDecorations() {
     }
     
     var topDecoration = 0
+    var decorationRect = CGRect.zero
     for window in windowList {
         guard let windowId = window[kCGWindowNumber] as? CGWindowID, let boundsDict = window[kCGWindowBounds] else {
             continue
+        }
+        if window[kCGWindowOwnerName] as! String == "HappyNY2025", let rect = CGRect(dictionaryRepresentation: boundsDict as! CFDictionary) {
+            decorationRect = rect
         }
         
         guard let decoration = AppDelegate.windowDecorations[windowId] else {
@@ -88,7 +92,7 @@ func alignDecorations() {
             continue
         }
         
-        decoration.frame = rect
+        decoration.frame = rect.offsetBy(dx: -decorationRect.minX, dy: -decorationRect.minY)
         decoration.order = topDecoration
         topDecoration += 1
     }
