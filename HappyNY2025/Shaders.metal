@@ -34,15 +34,18 @@ vertex VertexOut vertexFunction(
     uint vid [[vertex_id]],
     constant float2* vertices [[buffer(0)]],
     constant GlobalUniforms &globalUniforms [[buffer(1)]],
-    constant WindowUniforms &windowUniforms [[buffer(2)]]
+    constant WindowUniforms *windowUniforms [[buffer(2)]],
+    uint instanceId [[ instance_id ]]
 ) {
+    WindowUniforms windowUniform = windowUniforms[instanceId];
+    
     VertexOut out;
     float2 vert = vertices[vid];
-    out.startPosition = windowUniforms.position / globalUniforms.screenSize * globalUniforms.size;
-    out.resolution = windowUniforms.size * globalUniforms.size / globalUniforms.screenSize;
+    out.startPosition = windowUniform.position / globalUniforms.screenSize * globalUniforms.size;
+    out.resolution = windowUniform.size * globalUniforms.size / globalUniforms.screenSize;
     
-    float2 position = windowUniforms.position / globalUniforms.screenSize;
-    position += vert * windowUniforms.size / globalUniforms.screenSize;
+    float2 position = windowUniform.position / globalUniforms.screenSize;
+    position += vert * windowUniform.size / globalUniforms.screenSize;
     position = (position - 0.5) * 2.0;
     position.y = -position.y;
     
@@ -174,8 +177,4 @@ fragment float4 decorationFragmentFunction(
     color += wireColor * smoothstep(1.0, 0.7, a.x) * smoothstep(1.0, 0.7, a.y);
     
     return color;
-}
-
-fragment float4 clearFragmentFunction(VertexOut in [[stage_in]]) {
-    return float4(0, 0, 0, 1);
 }

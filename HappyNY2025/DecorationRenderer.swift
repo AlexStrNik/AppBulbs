@@ -47,35 +47,11 @@ func makeDecorationPipelineState(
     decorationPipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = .add
     decorationPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
     decorationPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
-    decorationPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-    decorationPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+    decorationPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = .zero
+    decorationPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .zero
     
     do {
         return try device.makeRenderPipelineState(descriptor: decorationPipelineStateDescriptor)
-    } catch {
-        fatalError("Failed to create render pipeline state")
-    }
-}
-
-func makeClearPipelineState(
-    device: MTLDevice,
-    vertexFunction: MTLFunction,
-    fragmentFunction: MTLFunction
-) -> MTLRenderPipelineState {
-    let clearPipelineState = MTLRenderPipelineDescriptor()
-    clearPipelineState.vertexFunction = vertexFunction
-    clearPipelineState.fragmentFunction = fragmentFunction
-    clearPipelineState.colorAttachments[0].pixelFormat = .bgra8Unorm
-    clearPipelineState.colorAttachments[0].isBlendingEnabled = true
-    clearPipelineState.colorAttachments[0].rgbBlendOperation = .subtract
-    clearPipelineState.colorAttachments[0].alphaBlendOperation = .subtract
-    clearPipelineState.colorAttachments[0].sourceRGBBlendFactor = .zero
-    clearPipelineState.colorAttachments[0].sourceAlphaBlendFactor = .zero
-    clearPipelineState.colorAttachments[0].destinationRGBBlendFactor = .oneMinusDestinationAlpha
-    clearPipelineState.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusDestinationAlpha
-    
-    do {
-        return try device.makeRenderPipelineState(descriptor: clearPipelineState)
     } catch {
         fatalError("Failed to create render pipeline state")
     }
@@ -87,10 +63,8 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
     
     private let vertexFunction: MTLFunction
     private let decorationFragmentFunction: MTLFunction
-    private let clearFragmentFunction: MTLFunction
     
     private let decorationPipelineState: MTLRenderPipelineState
-    private let clearPipelineState: MTLRenderPipelineState
     
     private let rectangleVertexBuffer: MTLBuffer
     private let rectangleIndexBuffer: MTLBuffer
@@ -112,7 +86,6 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
         
         self.vertexFunction = library.makeFunction(name: "vertexFunction")!
         self.decorationFragmentFunction = library.makeFunction(name: "decorationFragmentFunction")!
-        self.clearFragmentFunction = library.makeFunction(name: "clearFragmentFunction")!
         
         self.rectangleVertexBuffer = device.makeBuffer(
             bytes: rectangleVertices,
@@ -128,10 +101,7 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
         self.decorationPipelineState = makeDecorationPipelineState(
             device: device, vertexFunction: vertexFunction, fragmentFunction: decorationFragmentFunction
         )
-        self.clearPipelineState = makeClearPipelineState(
-            device: device, vertexFunction: vertexFunction, fragmentFunction: clearFragmentFunction
-        )
-        
+
         self.window = window
         
         super.init()
@@ -150,28 +120,21 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
         let renderPassDescriptor = view.currentRenderPassDescriptor!
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
-            
+        
         let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
         
         currentTime += 1.0 / Float(view.preferredFramesPerSecond)
         
-        for window in windows {
-            var windowUniforms = WindowUniforms(
-                position: window.position,
-                size: window.size
-            )
-            
-            drawDecoration(
-                commandEncoder: renderEncoder,
-                windowUniforms: &windowUniforms
-            )
-        }
-                
+        drawDecorations(
+            commandEncoder: renderEncoder,
+            windowUniforms: windows
+        )
+        
         renderEncoder.endEncoding()
-
+        
         let drawable = view.currentDrawable!
         commandBuffer.present(drawable)
-            
+        
         commandBuffer.commit()
     }
 
@@ -184,26 +147,16 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
         )
     }
     
-    func drawDecoration(commandEncoder: MTLRenderCommandEncoder, windowUniforms: inout WindowUniforms) {
-        commandEncoder.setRenderPipelineState(clearPipelineState)
-        commandEncoder.setVertexBuffer(rectangleVertexBuffer, offset: 0, index: 0)
-        
-        commandEncoder.setVertexBytes(&globalUniforms, length: MemoryLayout<GlobalUniforms>.stride, index: 1)
-        commandEncoder.setVertexBytes(&windowUniforms, length: MemoryLayout<WindowUniforms>.stride, index: 2)
-        
-        commandEncoder.drawIndexedPrimitives(
-            type: .triangle,
-            indexCount: 6,
-            indexType: .uint16,
-            indexBuffer: rectangleIndexBuffer,
-            indexBufferOffset: 0
-        )
-        
+    func drawDecorations(commandEncoder: MTLRenderCommandEncoder, windowUniforms: [WindowUniforms]) {
         commandEncoder.setRenderPipelineState(decorationPipelineState)
         commandEncoder.setVertexBuffer(rectangleVertexBuffer, offset: 0, index: 0)
         
         commandEncoder.setVertexBytes(&globalUniforms, length: MemoryLayout<GlobalUniforms>.stride, index: 1)
-        commandEncoder.setVertexBytes(&windowUniforms, length: MemoryLayout<WindowUniforms>.stride, index: 2)
+        commandEncoder.setVertexBytes(
+            windowUniforms,
+            length: MemoryLayout<WindowUniforms>.stride * windowUniforms.count,
+            index: 2
+        )
         
         var renderUniforms = RenderUniforms(
             time: currentTime,
@@ -217,7 +170,8 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
             indexCount: 6,
             indexType: .uint16,
             indexBuffer: rectangleIndexBuffer,
-            indexBufferOffset: 0
+            indexBufferOffset: 0,
+            instanceCount: windowUniforms.count
         )
     }
 }
