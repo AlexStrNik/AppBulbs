@@ -97,12 +97,14 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
     
     private var currentTime: Float = 0
     
+    private var window: NSWindow
+    
     var globalUniforms: GlobalUniforms = GlobalUniforms(
         screenSize: .zero,
         size: .zero
     )
     
-    init?(metalKitView: MTKView) {
+    init?(metalKitView: MTKView, window: NSWindow) {
         self.device = metalKitView.device!
         self.commandQueue = self.device.makeCommandQueue()!
         
@@ -130,10 +132,19 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
             device: device, vertexFunction: vertexFunction, fragmentFunction: clearFragmentFunction
         )
         
+        self.window = window
+        
         super.init()
     }
 
     func draw(in view: MTKView) {
+        let windows = getWindows()
+        guard let windows else {
+            self.window.orderOut(nil)
+            return
+        }
+        self.window.orderFrontRegardless()
+        
         let commandBuffer = self.commandQueue.makeCommandBuffer()!
         
         let renderPassDescriptor = view.currentRenderPassDescriptor!
@@ -144,7 +155,7 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
         
         currentTime += 1.0 / Float(view.preferredFramesPerSecond)
         
-        for window in getWindows() {
+        for window in windows {
             var windowUniforms = WindowUniforms(
                 position: window.position,
                 size: window.size

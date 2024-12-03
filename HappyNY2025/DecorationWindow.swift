@@ -33,7 +33,7 @@ class MetalDecorationWindow: NSPanel {
     public convenience init(rect: CGRect) {
         self.init(
             contentRect: rect.flipped,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.nonactivatingPanel, .fullSizeContentView, .hudWindow, .utilityWindow],
             backing: .buffered,
             defer: false
         )
@@ -49,14 +49,15 @@ class MetalDecorationWindow: NSPanel {
         self.isOpaque = false
         self.isMovable = false
         self.hasShadow = false
-        self.level = .floating // NSWindow.Level(Int(CGShieldingWindowLevel()))
+        self.level = .floating
         self.ignoresMouseEvents = true
         self.backgroundColor = .clear
+        self.sharingType = .none
         
         let mtkView = MTKView()
         mtkView.device = MTLCreateSystemDefaultDevice()
         
-        self.renderer = DecorationRenderer(metalKitView: mtkView)
+        self.renderer = DecorationRenderer(metalKitView: mtkView, window: self)
         mtkView.delegate = self.renderer
         
         mtkView.preferredFramesPerSecond = 120
