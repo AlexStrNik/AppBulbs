@@ -114,7 +114,7 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
             return
         }
         self.window.orderFrontRegardless()
-        
+
         let commandBuffer = self.commandQueue.makeCommandBuffer()!
         
         let renderPassDescriptor = view.currentRenderPassDescriptor!
@@ -124,11 +124,13 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
         let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
         
         currentTime += 1.0 / Float(view.preferredFramesPerSecond)
-        
-        drawDecorations(
-            commandEncoder: renderEncoder,
-            windowUniforms: windows
-        )
+
+        if !windows.isEmpty {
+            drawDecorations(
+                commandEncoder: renderEncoder,
+                windowUniforms: windows
+            )
+        }
         
         renderEncoder.endEncoding()
         
