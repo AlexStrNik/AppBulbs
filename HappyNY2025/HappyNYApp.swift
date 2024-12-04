@@ -58,15 +58,61 @@ func getWindows() -> [WindowUniforms]? {
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var shieldingWindow: MetalDecorationWindow? = nil
     
+    private var statusMenu: NSMenu!
+    private var statusBarItem: NSStatusItem!
+    
+    private var enabled: Bool = true
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else {
             return
         }
         
+        enableDecorations()
+        
+        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let statusButton = statusBarItem!.button
+        statusButton!.image = NSImage(systemSymbolName: "warninglight.fill", accessibilityDescription: "AppBulbs")
+        
+        let toggle = NSMenuItem(title: "Toggle", action: #selector(toggle), keyEquivalent: "")
+        let quit = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "")
+        
+        statusMenu = NSMenu()
+        
+        statusMenu!.addItem(toggle)
+         statusMenu!.addItem(.separator())
+        statusMenu!.addItem(quit)
+        
+        statusBarItem!.menu = statusMenu!
+    }
+    
+    func enableDecorations() {
         shieldingWindow = MetalDecorationWindow(
             rect: NSScreen.screens.first!.frame
         )
         shieldingWindow?.orderFrontRegardless()
+    }
+    
+    func disableDecorations() {
+        shieldingWindow?.close()
+    }
+    
+    @objc func toggle() {
+        if enabled {
+            disableDecorations()
+        } else {
+            enableDecorations()
+        }
+        enabled.toggle()
+
+        statusBarItem!.button!.image = NSImage(
+            systemSymbolName: enabled ? "warninglight.fill" : "warninglight",
+            accessibilityDescription: "AppBulbs"
+        )
+    }
+    
+    @objc func quitApp() {
+        NSApplication.shared.terminate(nil)
     }
     
     func applicationWillTerminate(_ notification: Notification) {

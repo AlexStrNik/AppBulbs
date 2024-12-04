@@ -33,7 +33,7 @@ class MetalDecorationWindow: NSPanel {
     public convenience init(rect: CGRect) {
         self.init(
             contentRect: rect.flipped,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView, .hudWindow, .utilityWindow],
+            styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )

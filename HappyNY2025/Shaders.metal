@@ -163,7 +163,7 @@ fragment float4 decorationFragmentFunction(
     color += sideLight(-2, index, count, uv, renderUniforms, iResolution);
     color += sideLight(2, index, count, uv, renderUniforms, iResolution);
     
-    float2 wireSize = float2(6.0, 6.0) * renderUniforms.bulbScale;
+    float2 wireSize = float2(4.0, 4.0) * renderUniforms.bulbScale;
     wireSize.x /= iResolution.x / count;
     wireSize.y /= iResolution.y;
     
