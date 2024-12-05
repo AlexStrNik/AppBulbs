@@ -14,6 +14,8 @@ func getWindows() -> [WindowUniforms]? {
     guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as NSArray? as? [[CFString: AnyObject]] else {
         return []
     }
+    
+    let screen = NSScreen.main!
 
     var decorations: [WindowUniforms] = []
     var decorationRect = CGRect.zero
@@ -42,11 +44,16 @@ func getWindows() -> [WindowUniforms]? {
             continue
         }
         
+        if rect.maxX < 0 || rect.minX > screen.frame.width {
+            continue
+        }
+        
         let fixedRect = rect.offsetBy(dx: -decorationRect.minX, dy: -decorationRect.minY)
         decorations.insert(
             WindowUniforms(
                 position: SIMD2(Float(fixedRect.minX), Float(fixedRect.minY)),
-                size: SIMD2(Float(fixedRect.width), Float(fixedRect.height))
+                size: SIMD2(Float(fixedRect.width), Float(fixedRect.height)),
+                fullscreen: rect.width == screen.frame.width ? 1 : 0
             ),
             at: 0
         )
@@ -80,7 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusMenu = NSMenu()
         
         statusMenu!.addItem(toggle)
-         statusMenu!.addItem(.separator())
+        statusMenu!.addItem(.separator())
         statusMenu!.addItem(quit)
         
         statusBarItem!.menu = statusMenu!

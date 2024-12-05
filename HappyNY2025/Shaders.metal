@@ -12,6 +12,7 @@ using namespace metal;
 struct WindowUniforms {
     float2 position;
     float2 size;
+    float fullscreen;
 };
 
 struct GlobalUniforms {
@@ -28,6 +29,7 @@ struct VertexOut {
     float4 position [[position]];
     float2 startPosition;
     float2 resolution;
+    float fullscreen;
 };
 
 vertex VertexOut vertexFunction(
@@ -50,6 +52,7 @@ vertex VertexOut vertexFunction(
     position.y = -position.y;
     
     out.position = float4(position, 0.0, 1.0);
+    out.fullscreen = windowUniform.fullscreen;
     return out;
 }
 
@@ -114,6 +117,12 @@ float4 sideLight(float shift, float index, float count, float2 uv, RenderUniform
     return lightColor(index + shift, renderUniforms) * lightFunc(dist);
 }
 
+float windowSDF(float2 coord, float2 resolution, float fullscreen) {
+    float radius = 24;
+    
+    return clamp(1 - (length(max(abs(coord - resolution / 2) - resolution / 2 + radius, 0.0)) - radius), fullscreen, 1.0);
+}
+
 fragment float4 decorationFragmentFunction(
     VertexOut in [[stage_in]],
     constant RenderUniforms &renderUniforms [[buffer(1)]]
@@ -176,5 +185,5 @@ fragment float4 decorationFragmentFunction(
     color -= float4(1.0, 1.0, 1.0, 0.0) * smoothstep(1.0, 0.7, a.x) * smoothstep(1.0, 0.7, a.y);
     color += wireColor * smoothstep(1.0, 0.7, a.x) * smoothstep(1.0, 0.7, a.y);
     
-    return color;
+    return color * windowSDF(fragCoord, iResolution, in.fullscreen);
 }

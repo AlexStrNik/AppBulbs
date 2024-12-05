@@ -21,6 +21,7 @@ let rectangleIndices: [ushort] = [
 struct WindowUniforms {
     var position: SIMD2<Float>
     var size: SIMD2<Float>
+    var fullscreen: Float
 }
 
 struct GlobalUniforms {
