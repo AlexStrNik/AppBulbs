@@ -110,11 +110,6 @@ class DecorationRenderer: NSObject, MTKViewDelegate {
 
     func draw(in view: MTKView) {
         let windows = getWindows()
-        guard let windows else {
-            self.window.orderOut(nil)
-            return
-        }
-        self.window.orderFrontRegardless()
 
         let commandBuffer = self.commandQueue.makeCommandBuffer()!
         

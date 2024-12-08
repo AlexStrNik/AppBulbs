@@ -52,7 +52,7 @@ class MetalDecorationWindow: NSPanel {
         self.level = .floating
         self.ignoresMouseEvents = true
         self.backgroundColor = .clear
-        self.sharingType = .none
+        self.sharingType = .readOnly
         
         let mtkView = MTKView()
         mtkView.device = MTLCreateSystemDefaultDevice()

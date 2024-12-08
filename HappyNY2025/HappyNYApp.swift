@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-func getWindows() -> [WindowUniforms]? {
+func getWindows() -> [WindowUniforms] {
     let options = CGWindowListOption(
         arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly, .optionOnScreenAboveWindow
     )
@@ -22,10 +22,6 @@ func getWindows() -> [WindowUniforms]? {
     
     guard windowList.count > 0 else {
         return []
-    }
-    
-    if windowList[0][kCGWindowOwnerName] as! String == "Screenshot" {
-        return nil
     }
     
     for window in windowList {
